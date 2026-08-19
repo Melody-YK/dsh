@@ -1,0 +1,49 @@
+name: Build DSH Mobile
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.0"
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  build-android:
+    needs: analyze
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.0"
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/app/outputs/flutter-apk/app-release.apk
+          body: |
+            ## DSH Mobile ${{ github.ref_name }}
+
+            Android APK (release, signed).
+
+            ### 安装
+            1. 下载 `app-release.apk`
+            2. 在手机上打开并安装（需允许"安装未知来源"）
+            3. 启动后输入 DSH 服务地址或扫码

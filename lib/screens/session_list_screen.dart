@@ -347,9 +347,12 @@ class _SessionListScreenState extends State<SessionListScreen> {
               if (v == 'disconnect') {
                 AppState.instance.disconnect();
                 Navigator.of(context).pushReplacementNamed('/config');
+              } else if (v == 'about') {
+                Navigator.of(context).pushNamed('/about');
               }
             },
             itemBuilder: (ctx) => const [
+              PopupMenuItem(value: 'about', child: Text('关于')),
               PopupMenuItem(value: 'disconnect', child: Text('断开连接')),
             ],
           ),

@@ -1,24 +1,32 @@
 # DSH Mobile 手机使用指南
 
-本文档说明从零到在手机上跑起来的完整流程（Windows 环境）。
+本文档说明从零到在手机上跑起来的完整流程（Windows 和 Mac 环境）。
 
-## ✅ 本机已完成（2026-08-15）
+## ✅ 本机状态
 
-- **Flutter SDK 3.47.0 已安装**：`D:\dev\flutter\flutter`（PATH 已配置，新开终端即可用 `flutter` 命令）
-- **APK 已构建完成**（无需再构建，直接传到手机即可）：
-  - 调试版：`build\app\outputs\flutter-apk\app-debug.apk`（146 MB，功能完整）
-  - 发布版：`build\app\outputs\flutter-apk\app-release.apk`（49.6 MB，推荐装这个，快且小）
-- 后续如需重新构建：`flutter build apk --release`
+### Windows 主机（2026-08-15）
+- **Flutter SDK 3.47.0 已安装**：`D:\dev\flutter\flutter`（PATH 已配置）
+- **APK 已构建**：`app-release.apk`（49.6 MB，已签名）
+- **DSH 服务端**：已配置 Tailscale + 端口转发
+
+### Mac 主机（2026-08-19）
+- **Flutter SDK 3.47.0 已安装**：`~/flutter/bin/flutter`
+- **DSH 服务端**：已配置 Tailscale + 端口转发（`dsh-mobile` 插件）
+- **Tailscale IP**：`100.122.227.32`
+- **一键启动**：双击 `~/Desktop/dsh-mobile/start-dsh.command`
+- **一键停止**：双击 `~/Desktop/dsh-mobile/stop-dsh.command`
+- **DSH 内命令**：`/dsh-mobile status` / `/dsh-mobile start` / `/dsh-mobile open`
 
 ## 一、传到手机（现在就能做）
 
-方式 A（推荐，USB 线连电脑，手机开启"开发者选项 → USB 调试"）：
-```powershell
-adb install -r build\app\outputs\flutter-apk\app-release.apk
-```
+从 Windows 主机：
+- 方式 A（USB）：`adb install -r build\app\outputs\flutter-apk\app-release.apk`
+- 方式 B（无线）：把 `app-release.apk` 通过微信/QQ/网盘发到手机
 
-方式 B：把 `app-release.apk` 通过微信/QQ/网盘发到手机，手机端点击安装
-（需允许"安装未知来源应用"）。
+从 Mac 主机（构建 APK 后）：
+- 方式 A（USB）：`adb install -r build/app/outputs/flutter-apk/app-release.apk`
+- 方式 B（Taildrop）：在 Windows 主机执行 `tailscale file cp app-release.apk melodymacbook-air:` 传文件到 Mac
+- 方式 C（无线）：把 APK 通过微信/QQ/网盘发到手机
 
 ## 二、服务端：让 DSH 能被手机访问
 
@@ -28,40 +36,43 @@ adb install -r build\app\outputs\flutter-apk\app-release.apk
 
 ### 一键启动（推荐）
 
-双击 `dsh-mobile-client\start-all.bat`，它会自动完成全部三件事（幂等，已运行的会跳过）：
+**Windows**：双击 `start-all.bat`，自动完成全部三件事（DSH + 转发器 + Tailscale serve + 连接页）。
 
-1. **DSH 实例**（`127.0.0.1:3080`），trusted-host 自动带上当前局域网 IP 和 Tailscale IP
-2. **局域网转发器**（`0.0.0.0:3081 → 127.0.0.1:3080`）
-3. **Tailscale serve**（`tcp:3081 → 127.0.0.1:3080`）
-
-启动后脚本会打印手机可用的两个地址：
-- 同一 WiFi：`http://<局域网IP>:3081`
-- 远程：`http://<Tailscale IP>:3081`
-
-**IP 变了也不用改脚本**——每次运行都会重新探测。
+**Mac**：双击 `~/Desktop/dsh-mobile/start-dsh.command`，或在 DSH 聊天框输入 `/dsh-mobile open`。
+启动后会自动：检测 Tailscale IP → 写入信任名单 → 配置 serve 转发 → 生成二维码连接页。
 
 ### 手动启动（等价命令）
 
+**Windows**：
 ```powershell
-# 1. 启动 DSH（dsh 不在 PATH，用完整路径）
-D:\Users\Melody\Desktop\日常不用\deepseek-harness-app\node_modules\.bin\dsh.CMD web --host 127.0.0.1 --port 3081 --trusted-host 192.168.1.4:3081
+# 1. 启动 DSH
+D:\Users\Melody\Desktop\日常不用\deepseek-harness-app\node_modules\.bin\dsh.CMD web --host 127.0.0.1 --port 3080 --trusted-host 192.168.1.4
 
-# 2. 另开一个窗口，启动转发
-node D:\workspace\clawbox-main\dsh-mobile-client\tools\port-forward.mjs 3081 3081
+# 2. 端口转发
+node tools\port-forward.mjs 3081 3080
 ```
 
-### 远程（出门在外，Tailscale）—— 本机已配置完成 ✅
+**Mac**：
+```bash
+# 已通过 dsh-mobile 插件自动管理，无需手动执行
+# 如需手动：
+TS_IP=$(tailscale ip -4 | head -1)
+dsh web --host 127.0.0.1 --port 3080 --trusted-host "$TS_IP"
+tailscale serve --bg --tcp=3081 3080
+```
 
-电脑 Tailscale IP：`100.106.157.69`（机器名 desktop-fu8glfm）
+### 远程（出门在外，Tailscale）
 
-已完成：
-1. Tailscale 已安装并登录（账号 1340135887@）
-2. `tailscale serve --bg --tcp=3081 3081` 已配置（Tailscale 网内 3081 → 本机 127.0.0.1:3081）
-3. DSH 实例 `--trusted-host` 已包含 `100.106.157.69`
+**Windows 主机**：Tailscale IP `100.106.157.69`（desktop-fu8glfm），已配置 serve。
 
-**手机端**：
-1. 手机装 Tailscale App，登录同一账号并保持"连接中"状态
-2. DSH Mobile 里填 `http://100.106.157.69:3081`
+**Mac 主机**：Tailscale IP `100.122.227.32`（melodymacbook-air），已配置 serve + dsh-mobile 插件。
+
+**手机端**（同 tailnet 账号 `1340135887@`）：
+1. 手机装 Tailscale App，登录同一账号并保持连接
+2. DSH Mobile 里填：
+   - 连 Windows：`http://100.106.157.69:3081`
+   - 连 Mac：`http://100.122.227.32:3081`
+3. 或扫码连接页上的二维码
 
 常用命令：
 ```powershell
