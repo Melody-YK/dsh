@@ -1,0 +1,24 @@
+name: dsh_mobile
+description: "DeepSeek Harness 手机端：原生 App 直连 DSH /api 协议（HTTP RPC + WebSocket 下行流）"
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  web_socket_channel: ^2.4.0
+  shared_preferences: ^2.2.0
+  flutter_markdown: ^0.7.4
+  mobile_scanner: ^7.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

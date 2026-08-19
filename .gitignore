@@ -1,0 +1,33 @@
+# Flutter / Dart 构建产物
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# 构建日志
+build_r*.log
+
+# 运行时日志
+logs/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 本地配置（含凭据、地址等）
+*.local
+.credentials.yaml
+
+# Kotlin 编译缓存
+android/.kotlin/
+
+# 临时文件
+*.tmp
+*.tgz
+*.zip
