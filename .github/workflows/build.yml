@@ -1,5 +1,9 @@
 name: Build DSH Mobile
 
+# 新仓库 GITHUB_TOKEN 默认只读；发布 Release 需要写权限
+permissions:
+  contents: write
+
 on:
   push:
     branches: [main]
