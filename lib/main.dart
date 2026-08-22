@@ -10,6 +10,7 @@ import 'screens/chat_screen.dart';
 import 'screens/server_config_screen.dart';
 import 'screens/session_list_screen.dart';
 import 'screens/about_screen.dart';
+import 'screens/settings_screen.dart';
 import 'state/app_state.dart';
 import 'widgets/respond_handler.dart';
 
@@ -105,6 +106,8 @@ class DshMobileApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => ChatScreen(sessionId: id ?? ''));
           case '/about':
             return MaterialPageRoute(builder: (_) => const AboutScreen());
+          case '/settings':
+            return MaterialPageRoute(builder: (_) => const SettingsScreen());
           default:
             return MaterialPageRoute(builder: (_) => const SessionListScreen());
         }

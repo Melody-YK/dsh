@@ -9,6 +9,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../core/api/sessions_api.dart';
 import '../state/app_state.dart';
 import '../state/chat_controller.dart';
+import '../widgets/session_list_view.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key, required this.sessionId});
@@ -196,7 +197,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 4,
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
+        ),
+        titleSpacing: 0,
         title: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: _showModelPicker,
@@ -237,6 +244,55 @@ class _ChatScreenState extends State<ChatScreen> {
               onPressed: _cancel,
             ),
         ],
+      ),
+      drawer: Drawer(
+        child: SafeArea(
+          child: Column(
+            children: [
+              // 抽屉头部
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Color(0xFF2C2C2E), width: 0.5)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: _primary.withAlpha(30),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.auto_awesome, size: 18, color: _primary),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text('会话', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.settings_outlined, size: 20),
+                      onPressed: () => Navigator.of(context).pushNamed('/settings'),
+                    ),
+                  ],
+                ),
+              ),
+              // 会话列表
+              Expanded(
+                child: SessionListView(
+                  compact: true,
+                  onSessionTap: (id) {
+                    Navigator.of(context).pop(); // 关闭抽屉
+                    if (id != widget.sessionId) {
+                      Navigator.of(context).pushReplacementNamed('/chat', arguments: id);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
       body: SafeArea(
         child: Column(
