@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../state/app_state.dart';
+import '../../main.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -40,6 +41,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _setTheme(String mode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('theme_mode', mode);
+    themeNotifier.value = mode == 'light' ? ThemeMode.light
+        : mode == 'dark' ? ThemeMode.dark
+        : ThemeMode.system;
     setState(() => _themeMode = mode);
   }
 
