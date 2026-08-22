@@ -8,6 +8,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 
 class AboutScreen extends StatefulWidget {
@@ -18,7 +19,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _currentVersion = '0.1.0';
+  static const _currentVersion = '0.2.0';
   static const _repoOwner = 'Melody-YK';
   static const _repoName = 'dsh';
 
@@ -115,9 +116,9 @@ class _AboutScreenState extends State<AboutScreen> {
 
   Future<void> _openUrl(String url) async {
     try {
-      await http.get(Uri.parse(url)).timeout(const Duration(seconds: 1));
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (_) {
-      // 忽略；直接在浏览器打开
+      // 浏览器打开失败，忽略
     }
   }
 
