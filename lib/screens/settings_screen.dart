@@ -66,10 +66,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // 格式: "current preset danger-full-access (available: read-only, workspace-write, danger-full-access)"
       final current = RegExp(r'current preset (\S+)').firstMatch(msg)?.group(1) ?? '?';
       final available = RegExp(r'available: (.+)\)').firstMatch(msg)?.group(1)?.split(', ') ?? [];
-      if (mounted) setState(() {
-        _permissionPreset = current;
-        _permissionOptions = available;
-      });
+      if (mounted) {
+        setState(() {
+          _permissionPreset = current;
+          _permissionOptions = available;
+        });
+      }
     } catch (_) {}
   }
 
@@ -114,10 +116,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         options.add({'id': id, 'name': name, 'desc': desc});
         if (isDefault) current = id;
       }
-      if (mounted) setState(() {
-        _agentOptions = options;
-        _agentPreset = current ?? options.firstOrNull?['id'] ?? '?';
-      });
+      if (mounted) {
+        setState(() {
+          _agentOptions = options;
+          _agentPreset = current ?? options.firstOrNull?['id'] ?? '?';
+        });
+      }
     } catch (_) {}
   }
 
