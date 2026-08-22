@@ -41,7 +41,7 @@ subprojects {
 gradle.projectsEvaluated {
     subprojects {
         extensions.findByType<com.android.build.gradle.BaseExtension>()?.let {
-            it.ndkVersion = "28.1.13356709"
+            it.ndkVersion = "28.2.13676358"
         }
     }
 }
