@@ -32,8 +32,9 @@ jobs:
       # gradle.properties 禁用了 AGP 自动下载 SDK；runner 上手动装齐固定版本
       - name: Install Android SDK components
         run: |
-          sdkmanager --install "ndk;28.1.13356709" "build-tools;36.1.0"
-          yes | sdkmanager --licenses > /dev/null
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null
+          yes | "$SDKMANAGER" --install "ndk;28.1.13356709" "build-tools;36.1.0" > /dev/null
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
