@@ -41,15 +41,15 @@ jobs:
           name: app-release
           path: build/app/outputs/flutter-apk/app-release.apk
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/app/outputs/flutter-apk/app-release.apk
-          body: |
-            ## DSH Mobile ${{ github.ref_name }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            build/app/outputs/flutter-apk/app-release.apk \
+            --title "DSH Mobile ${{ github.ref_name }}" \
+            --notes "Android APK (release, signed).
 
-            Android APK (release, signed).
-
-            ### 安装
-            1. 下载 `app-release.apk`
-            2. 在手机上打开并安装（需允许"安装未知来源"）
-            3. 启动后输入 DSH 服务地址或扫码
+### 安装
+1. 下载 \`app-release.apk\`
+2. 在手机上打开并安装（需允许\"安装未知来源\"）
+3. 启动后输入 DSH 服务地址或扫码"
