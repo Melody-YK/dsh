@@ -4,7 +4,6 @@ library;
 import 'package:flutter/material.dart';
 
 import '../core/protocol/connection.dart';
-import '../core/api/sessions_api.dart';
 import '../state/app_state.dart';
 import '../widgets/session_list_view.dart';
 import 'directory_picker_screen.dart';
@@ -18,8 +17,6 @@ class SessionListScreen extends StatefulWidget {
 
 class _SessionListScreenState extends State<SessionListScreen> {
   bool _creating = false;
-  final Set<String> _expandedWorkspaces = {};
-  bool _archivedExpanded = false;
 
   static const _primary = Color(0xFF4D6BFE);
 
@@ -122,151 +119,6 @@ class _SessionListScreenState extends State<SessionListScreen> {
   void _openSession(String id) {
     Navigator.of(context).pushNamed('/chat', arguments: id);
   }
-
-  void _sessionMenu(SessionSummary s, {bool archived = false}) {
-    final actions = <String>[];
-    if (!archived) {
-      actions.addAll(['rename', 'archive', 'move']);
-    } else {
-      actions.addAll(['unarchive']);
-    }
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final a in actions)
-              ListTile(
-                leading: Icon(_menuIcon(a), size: 20),
-                title: Text(_menuLabel(a)),
-                onTap: () => Navigator.pop(ctx, a),
-              ),
-          ],
-        ),
-      ),
-    ).then((v) async {
-      if (v == null || !mounted) return;
-      try {
-        switch (v) {
-          case 'rename':
-            final name = await _promptName('重命名会话', s.title ?? s.sessionId);
-            if (name != null) await AppState.instance.renameSession(s.sessionId, name);
-            break;
-          case 'archive':
-            await AppState.instance.archiveSession(s.sessionId);
-            break;
-          case 'move':
-          case 'unarchive':
-            await _moveSession(s.sessionId);
-            break;
-        }
-        await AppState.instance.refreshSessions();
-        await AppState.instance.refreshWorkspaces();
-      } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-      }
-    });
-  }
-
-  Future<void> _moveSession(String sessionId) async {
-    final ws = AppState.instance.workspaces;
-    if (ws.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('没有工作区，请先新建')));
-      return;
-    }
-    final target = await showModalBottomSheet<String>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('移动到工作区', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            ),
-            for (final w in ws)
-              ListTile(
-                title: Text(w.title),
-                onTap: () => Navigator.pop(ctx, w.workspaceId),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (target != null) {
-      await AppState.instance.moveSessionToWorkspace(target, sessionId);
-    }
-  }
-
-  void _workspaceMenu(WorkspaceView ws) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit_outlined, size: 20),
-              title: const Text('重命名'),
-              onTap: () => Navigator.pop(ctx, 'rename'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline, size: 20),
-              title: const Text('删除工作区'),
-              subtitle: const Text('会话保留，归入未分组'),
-              onTap: () => Navigator.pop(ctx, 'delete'),
-            ),
-          ],
-        ),
-      ),
-    ).then((v) async {
-      if (v == null || !mounted) return;
-      if (v == 'rename') {
-        final name = await _promptName('重命名工作区', ws.title);
-        if (name != null) await AppState.instance.renameWorkspace(ws.workspaceId, name);
-      } else if (v == 'delete') {
-        await AppState.instance.deleteWorkspace(ws.workspaceId);
-        _expandedWorkspaces.remove(ws.workspaceId);
-      }
-      await AppState.instance.refreshWorkspaces();
-      await AppState.instance.refreshSessions();
-      setState(() {});
-    });
-  }
-
-  Future<String?> _promptName(String title, String initial) async {
-    final ctrl = TextEditingController(text: initial);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: TextField(controller: ctrl, autofocus: true, decoration: const InputDecoration(hintText: '输入名称')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text), child: const Text('确定')),
-        ],
-      ),
-    );
-    ctrl.dispose();
-    return (result != null && result.trim().isNotEmpty) ? result.trim() : null;
-  }
-
-  IconData _menuIcon(String a) => switch (a) {
-        'rename' => Icons.edit_outlined,
-        'archive' => Icons.archive_outlined,
-        'unarchive' => Icons.unarchive_outlined,
-        'move' => Icons.drive_file_move_outlined,
-        _ => Icons.more_horiz,
-      };
-
-  String _menuLabel(String a) => switch (a) {
-        'rename' => '重命名',
-        'archive' => '归档',
-        'unarchive' => '恢复到工作区',
-        'move' => '移动到工作区',
-        _ => a,
-      };
 
   void _showAddMenu() {
     showModalBottomSheet<String>(
