@@ -7,8 +7,9 @@ plugins {
 android {
     namespace = "com.dshmobile.dsh_mobile"
     compileSdk = flutter.compileSdkVersion
-    // 纯 Dart 项目无需 NDK；不声明 ndkVersion，避免触发 NDK 下载
-    // ndkVersion = flutter.ndkVersion
+    // mobile_scanner 等原生插件场景需要 NDK；固定为本地已安装的版本，
+    // 避免 AGP 自动下载 28.2 触发 sdkmanager（网络慢会挂起）
+    ndkVersion = "28.1.13356709"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
