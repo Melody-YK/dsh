@@ -131,9 +131,19 @@ class _ChatScreenState extends State<ChatScreen> {
   /// 弹出模型选择：列出当前会话可用模型分组，点击切换（含推理档位）。
   Future<void> _showModelPicker() async {
     final conn = AppState.instance.conn;
-    if (conn == null) return;
+    if (conn == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('未连接，无法切换模型')));
+      return;
+    }
     ModelCatalog catalog;
     try {
+      // 先给用户反馈，避免看起来"卡住"
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('加载模型列表…'), duration: Duration(seconds: 1)),
+        );
+      }
       catalog = await SessionsApi(conn.rpc).models(widget.sessionId);
     } catch (e) {
       if (!mounted) return;

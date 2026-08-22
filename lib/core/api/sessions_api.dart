@@ -333,24 +333,38 @@ class ModelGroup {
 
 /// 一个模型条目。
 class ModelEntry {
-  ModelEntry({required this.id, required this.name, this.reasoningEfforts = const []});
+  ModelEntry({required this.id, required this.name, this.reasoningEfforts = const [], this.reasoningEffortNames = const []});
 
   factory ModelEntry.fromJson(Map<String, Object?> json) {
-    // reasoning.efforts 是档位 id 数组（如 ["min","low","medium","high","max"]）
+    // reasoning.efforts 是档位对象数组（如 [{"id":"high","name":"High"},...]），取 id 作为档位值
     final reasoning = json['reasoning'] as Map<String, Object?>?;
-    final efforts = ((reasoning?['efforts'] as List<Object?>?) ?? const []).cast<String>();
+    final effortsObjects = (reasoning?['efforts'] as List<Object?>?) ?? const [];
+    final efforts = effortsObjects
+        .whereType<Map<String, Object?>>()
+        .map((e) => e['id'] as String?)
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toList();
     return ModelEntry(
       id: json['id'] as String,
       name: json['name'] as String,
       reasoningEfforts: efforts,
+      reasoningEffortNames: effortsObjects
+          .whereType<Map<String, Object?>>()
+          .map((e) => (e['name'] as String?) ?? (e['id'] as String? ?? ''))
+          .where((n) => n.isNotEmpty)
+          .toList(),
     );
   }
 
   final String id;
   final String name;
 
-  /// 该模型支持的推理档位（空 = 不支持/未知）。
+  /// 该模型支持的推理档位 id（如 ["off","high","max"]）。
   final List<String> reasoningEfforts;
+
+  /// 档位显示名（与 reasoningEfforts 一一对应）。
+  final List<String> reasoningEffortNames;
 }
 
 /// 当前模型选择。
