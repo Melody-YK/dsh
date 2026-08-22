@@ -270,14 +270,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
             ),
             if (running) const LinearProgressIndicator(minHeight: 2, backgroundColor: Colors.transparent),
-            _buildInputBar(theme),
+            _buildInputBar(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInputBar(ThemeData theme) {
+  Widget _buildInputBar() {
     return Container(
       padding: EdgeInsets.only(left: 12, right: 8, top: 10, bottom: 10 + MediaQuery.of(context).padding.bottom),
       decoration: const BoxDecoration(
@@ -333,7 +333,6 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     switch (message.role) {
       case 'user':
         return Padding(
