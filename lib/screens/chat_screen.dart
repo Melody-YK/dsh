@@ -384,7 +384,7 @@ class _MessageBubble extends StatelessWidget {
                       data: message.text!,
                       styleSheet: MarkdownStyleSheet(
                         p: const TextStyle(fontSize: 15, height: 1.5, color: Colors.white),
-                        code: TextStyle(fontSize: 13, backgroundColor: const Color(0xFF2C2C2E), fontFamily: 'monospace'),
+                        code: const TextStyle(fontSize: 13, backgroundColor: Color(0xFF2C2C2E), fontFamily: 'monospace'),
                         blockquoteDecoration: const BoxDecoration(
                           border: Border(left: BorderSide(color: _primary, width: 3)),
                         ),
