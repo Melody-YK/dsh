@@ -19,12 +19,12 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  static const _primary = Color(0xFF4D6BFE);
+
   ChatController? _controller;
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   bool _sending = false;
-
-  /// 当前会话使用的模型（进入页面时加载，切换后刷新）。
   ModelSelection? _currentModel;
 
   @override
@@ -38,7 +38,6 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) _scrollToBottom(animated: false);
     };
     controller.addListener(_onChatChanged);
-    // 向上滑到更早消息处（reverse 列表的 maxScrollExtent）时加载更多历史
     _scrollController.addListener(() {
       final c = _controller;
       if (c == null || !c.hasMore || c.loading) return;
@@ -52,7 +51,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadCurrentModel();
   }
 
-  /// 加载当前会话的模型，显示在 AppBar。
   Future<void> _loadCurrentModel() async {
     final conn = AppState.instance.conn;
     if (conn == null) return;
@@ -60,16 +58,12 @@ class _ChatScreenState extends State<ChatScreen> {
       final catalog = await SessionsApi(conn.rpc).models(widget.sessionId);
       if (!mounted) return;
       setState(() => _currentModel = catalog.current);
-    } catch (_) {
-      // 模型信息加载失败不影响聊天
-    }
+    } catch (_) {}
   }
 
   void _onChatChanged() {
     if (!mounted) return;
     setState(() {});
-    // 只有用户在底部附近（reverse: offset 接近 0）时才自动跟随到底部；
-    // 用户滚上去看历史时不打扰
     if (_scrollController.hasClients && _scrollController.position.pixels < 200) {
       _scrollToBottom();
     }
@@ -86,7 +80,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _scrollToBottom({bool animated = true}) {
     if (!_scrollController.hasClients) return;
-    // reverse 列表：offset 0 = 底部（最新消息）
     if (animated) {
       _scrollController.animateTo(0, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
     } else {
@@ -99,46 +92,33 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.isEmpty || _sending) return;
     final conn = AppState.instance.conn;
     if (conn == null) return;
-    setState(() => _sending = true);
     _inputController.clear();
-    // 乐观回显：发消息立即在界面显示
-    _controller?.addOptimistic(text);
+    setState(() => _sending = true);
     try {
-      final api = SessionsApi(conn.rpc);
-      // 不传 clientTimeZone：Dart 的 timeZoneName 是本地化名称（如"中国标准时间"），
-      // 不是 IANA Area/Location 名，服务端会拒绝（invalid-time-zone）
-      await api.prompt(widget.sessionId, [PromptTextPart(text)]);
+      await SessionsApi(conn.rpc).prompt(widget.sessionId, [PromptTextPart(text)]);
     } catch (e) {
-      _controller?.removeOptimistic(text);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('发送失败: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('发送失败: $e')));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
   }
 
   Future<void> _cancel() async {
-    final conn = AppState.instance.conn;
-    if (conn == null) return;
     try {
-      await SessionsApi(conn.rpc).cancel(widget.sessionId);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('取消失败: $e')));
-    }
+      final conn = AppState.instance.conn;
+      if (conn != null) await SessionsApi(conn.rpc).cancel(widget.sessionId);
+    } catch (_) {}
   }
 
-  /// 弹出模型选择：列出当前会话可用模型分组，点击切换（含推理档位）。
   Future<void> _showModelPicker() async {
     final conn = AppState.instance.conn;
     if (conn == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('未连接，无法切换模型')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('未连接')));
       return;
     }
     ModelCatalog catalog;
     try {
-      // 先给用户反馈，避免看起来"卡住"
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('加载模型列表…'), duration: Duration(seconds: 1)),
@@ -152,7 +132,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (!mounted) return;
 
-    // 选模型：返回 (provider, model, 支持的推理档位)
     final picked = await showModalBottomSheet<(String, String, List<String>)>(
       context: context,
       builder: (ctx) => _ModelPickerSheet(catalog: catalog),
@@ -160,15 +139,12 @@ class _ChatScreenState extends State<ChatScreen> {
     if (picked == null || !mounted) return;
 
     final (provider, model, efforts) = picked;
-
-    // 模型支持推理档位 → 再选档位
     String? effort;
     if (efforts.isNotEmpty) {
       effort = await _pickReasoningEffort(efforts, currentEffort: _currentModel?.reasoningEffort);
-      if (effort == null && mounted) return; // 用户下滑关闭 = 取消切换
-      if (effort == '') effort = null; // "不指定" = 用模型默认
+      if (effort == null && mounted) return;
+      if (effort == '') effort = null;
     }
-
     try {
       await SessionsApi(conn.rpc).selectModel(widget.sessionId, provider: provider, model: model, reasoningEffort: effort);
       if (!mounted) return;
@@ -182,7 +158,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// 推理档位选择（含"不指定"选项）。
   Future<String?> _pickReasoningEffort(List<String> efforts, {String? currentEffort}) async {
     return showModalBottomSheet<String>(
       context: context,
@@ -221,28 +196,43 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        // 标题：会话 id + 当前模型（可点击弹出模型选择）
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.sessionId, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16)),
-            if (_currentModel != null)
-              Text(
-                '${_currentModel!.model}${_currentModel!.reasoningEffort != null ? ' · ${_currentModel!.reasoningEffort}' : ''}',
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary),
-              ),
-          ],
+        titleSpacing: 4,
+        title: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: _showModelPicker,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.chat_bubble_outline, size: 16),
+                    const SizedBox(width: 6),
+                    Text(widget.sessionId.substring(0, 8), overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.expand_more, size: 16),
+                  ],
+                ),
+                if (_currentModel != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 22),
+                    child: Text(
+                      '${_currentModel!.model}${_currentModel!.reasoningEffort != null ? ' · ${_currentModel!.reasoningEffort}' : ''}',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11, color: _primary),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.tune),
-            tooltip: '切换模型',
-            onPressed: _showModelPicker,
-          ),
           if (running)
             IconButton(
-              icon: const Icon(Icons.stop_circle_outlined),
+              icon: const Icon(Icons.stop_circle_outlined, color: Colors.redAccent),
               tooltip: '取消生成',
               onPressed: _cancel,
             ),
@@ -254,31 +244,32 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: controller == null
                   ? const Center(child: Text('未连接'))
-                  : AnimatedBuilder(
-                      animation: controller,
+                  : ListenableBuilder(
+                      listenable: controller,
                       builder: (ctx, _) {
                         if (controller.loading && controller.messages.isEmpty) {
                           return const Center(child: CircularProgressIndicator());
                         }
                         if (controller.error != null && controller.messages.isEmpty) {
                           return Center(
-                            child: Text(controller.error!, style: TextStyle(color: theme.colorScheme.error)),
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(controller.error!, style: TextStyle(color: theme.colorScheme.error)),
+                            ),
                           );
                         }
                         final messages = controller.messages;
-                        // reverse: true 让最新消息默认显示在底部（offset 0 = 底部），
-                        // itemBuilder 倒序访问：index 0 = 最新消息
                         return ListView.builder(
                           controller: _scrollController,
                           reverse: true,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
                           itemCount: messages.length,
                           itemBuilder: (ctx, i) => _MessageBubble(message: messages[messages.length - 1 - i]),
                         );
                       },
                     ),
             ),
-            if (running) const LinearProgressIndicator(minHeight: 2),
+            if (running) const LinearProgressIndicator(minHeight: 2, backgroundColor: Colors.transparent),
             _buildInputBar(theme),
           ],
         ),
@@ -288,39 +279,44 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildInputBar(ThemeData theme) {
     return Container(
-      padding: EdgeInsets.only(
-        left: 12,
-        right: 8,
-        top: 8,
-        bottom: 8 + MediaQuery.of(context).padding.bottom,
-      ),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+      padding: EdgeInsets.only(left: 12, right: 8, top: 10, bottom: 10 + MediaQuery.of(context).padding.bottom),
+      decoration: const BoxDecoration(
+        color: Color(0xFF151517),
+        border: Border(top: BorderSide(color: Color(0xFF2C2C2E), width: 0.5)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
-            child: TextField(
-              controller: _inputController,
-              minLines: 1,
-              maxLines: 5,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _send(),
-              decoration: const InputDecoration(
-                hintText: '输入消息…',
-                border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(20))),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                isDense: true,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF232325),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: TextField(
+                controller: _inputController,
+                minLines: 1,
+                maxLines: 5,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _send(),
+                style: const TextStyle(fontSize: 15),
+                decoration: const InputDecoration(
+                  hintText: '输入消息…',
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                ),
               ),
             ),
           ),
-          const SizedBox(width: 4),
-          IconButton.filled(
-            onPressed: _sending ? null : _send,
-            icon: const Icon(Icons.send),
-            tooltip: '发送',
+          const SizedBox(width: 8),
+          Container(
+            decoration: const BoxDecoration(color: _primary, shape: BoxShape.circle),
+            child: IconButton(
+              onPressed: _sending ? null : _send,
+              icon: _sending
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+            ),
           ),
         ],
       ),
@@ -333,72 +329,78 @@ class _MessageBubble extends StatelessWidget {
   const _MessageBubble({required this.message});
   final ChatMessage message;
 
+  static const _primary = Color(0xFF4D6BFE);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     switch (message.role) {
       case 'user':
-        return Align(
-          alignment: Alignment.centerRight,
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            constraints: const BoxConstraints(maxWidth: 300),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(16),
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: _primary.withAlpha(40),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(18), topRight: Radius.circular(18),
+                  bottomLeft: Radius.circular(18), bottomRight: Radius.circular(4),
+                ),
+              ),
+              child: Text(message.text ?? '', style: const TextStyle(fontSize: 15, height: 1.4)),
             ),
-            child: Text(message.text ?? '', style: theme.textTheme.bodyMedium),
           ),
         );
       case 'assistant':
-        return Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            constraints: const BoxConstraints(maxWidth: 320),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (message.model != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      message.model!,
-                      style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary),
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 330),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF202124),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(18), topRight: Radius.circular(18),
+                  bottomLeft: Radius.circular(4), bottomRight: Radius.circular(18),
+                ),
+                border: Border.all(color: const Color(0xFF2C2C2E), width: 0.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (message.model != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(message.model!, style: const TextStyle(fontSize: 11, color: _primary, fontWeight: FontWeight.w600)),
                     ),
-                  ),
-                // 思考过程：默认折叠，点按钮展开完整内容
-                if (message.reasoning != null && message.reasoning!.isNotEmpty)
-                  _ReasoningBlock(reasoning: message.reasoning!),
-                // 正式回答是 Markdown，用渲染器展示
-                if (message.text != null && message.text!.isNotEmpty)
-                  MarkdownBody(
-                    data: message.text!,
-                    styleSheet: MarkdownStyleSheet(
-                      p: theme.textTheme.bodyMedium,
-                      code: theme.textTheme.bodySmall?.copyWith(
-                        backgroundColor: theme.colorScheme.surfaceContainerHigh,
-                        fontFamily: 'monospace',
-                      ),
-                      blockquoteDecoration: BoxDecoration(
-                        border: Border(
-                          left: BorderSide(color: theme.colorScheme.outlineVariant, width: 3),
+                  if (message.reasoning != null && message.reasoning!.isNotEmpty)
+                    _ReasoningBlock(reasoning: message.reasoning!),
+                  if (message.text != null && message.text!.isNotEmpty)
+                    MarkdownBody(
+                      data: message.text!,
+                      styleSheet: MarkdownStyleSheet(
+                        p: const TextStyle(fontSize: 15, height: 1.5, color: Colors.white),
+                        code: TextStyle(fontSize: 13, backgroundColor: const Color(0xFF2C2C2E), fontFamily: 'monospace'),
+                        blockquoteDecoration: const BoxDecoration(
+                          border: Border(left: BorderSide(color: _primary, width: 3)),
+                        ),
+                        codeblockDecoration: BoxDecoration(
+                          color: const Color(0xFF151517),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         );
       default:
-        // tool 消息已被 messages 过滤，不再渲染
         return const SizedBox.shrink();
     }
   }
@@ -407,7 +409,6 @@ class _MessageBubble extends StatelessWidget {
 /// 思考过程折叠块：默认只显示前几行，点击展开/收起。
 class _ReasoningBlock extends StatefulWidget {
   const _ReasoningBlock({required this.reasoning});
-
   final String reasoning;
 
   @override
@@ -417,31 +418,32 @@ class _ReasoningBlock extends StatefulWidget {
 class _ReasoningBlockState extends State<_ReasoningBlock> {
   bool _expanded = false;
 
+  static const _primary = Color(0xFF4D6BFE);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final full = widget.reasoning;
-    // 折叠时只取前 160 字符（约 2-3 行），避免思考过程铺满屏幕
     const previewLen = 160;
     final collapsed = full.length <= previewLen;
     final shown = _expanded || collapsed ? full : '${full.substring(0, previewLen)}…';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
+        color: const Color(0xFF151517),
         borderRadius: BorderRadius.circular(10),
-        border: Border(left: BorderSide(color: theme.colorScheme.outlineVariant, width: 3)),
+        border: const Border(left: BorderSide(color: _primary, width: 3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.psychology_outlined, size: 14, color: theme.colorScheme.outline),
-              const SizedBox(width: 4),
-              Text('思考过程', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
+              const Icon(Icons.psychology_outlined, size: 14, color: _primary),
+              const SizedBox(width: 6),
+              const Text('思考过程', style: TextStyle(fontSize: 12, color: _primary, fontWeight: FontWeight.w600)),
               const Spacer(),
               if (!collapsed)
                 InkWell(
@@ -449,25 +451,15 @@ class _ReasoningBlockState extends State<_ReasoningBlock> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        _expanded ? '收起' : '展开',
-                        style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary),
-                      ),
-                      Icon(
-                        _expanded ? Icons.expand_less : Icons.expand_more,
-                        size: 16,
-                        color: theme.colorScheme.primary,
-                      ),
+                      Text(_expanded ? '收起' : '展开', style: const TextStyle(fontSize: 11, color: _primary)),
+                      Icon(_expanded ? Icons.expand_less : Icons.expand_more, size: 16, color: _primary),
                     ],
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            shown,
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.4),
-          ),
+          const SizedBox(height: 6),
+          Text(shown, style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant, height: 1.4)),
         ],
       ),
     );
@@ -477,8 +469,9 @@ class _ReasoningBlockState extends State<_ReasoningBlock> {
 /// 模型选择底部弹窗：按 provider 分组，当前模型打勾，点击返回选择。
 class _ModelPickerSheet extends StatelessWidget {
   const _ModelPickerSheet({required this.catalog});
-
   final ModelCatalog catalog;
+
+  static const _primary = Color(0xFF4D6BFE);
 
   @override
   Widget build(BuildContext context) {
@@ -491,10 +484,7 @@ class _ModelPickerSheet extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(
-              '切换模型（当前：${current.provider} / ${current.model}）',
-              style: theme.textTheme.titleMedium,
-            ),
+            child: Text('切换模型（当前：${current.provider} / ${current.model}）', style: theme.textTheme.titleMedium),
           ),
           Flexible(
             child: ListView(
@@ -503,21 +493,14 @@ class _ModelPickerSheet extends StatelessWidget {
                 for (final group in catalog.groups) ...[
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                    child: Text(
-                      group.name,
-                      style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary),
-                    ),
+                    child: Text(group.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _primary)),
                   ),
                   for (final model in group.models)
                     ListTile(
                       dense: true,
                       leading: Icon(
-                        (group.id == current.provider && model.id == current.model)
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_off,
-                        color: (group.id == current.provider && model.id == current.model)
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.outline,
+                        (group.id == current.provider && model.id == current.model) ? Icons.radio_button_checked : Icons.radio_button_off,
+                        color: (group.id == current.provider && model.id == current.model) ? _primary : theme.colorScheme.outline,
                       ),
                       title: Text(model.name),
                       subtitle: Text(

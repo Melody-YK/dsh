@@ -132,12 +132,23 @@ class _AboutScreenState extends State<AboutScreen> {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          const Icon(Icons.phone_android, size: 64, color: Color(0xFF4D6BFE)),
           const SizedBox(height: 16),
+          // 图标
+          Container(
+            width: 80,
+            height: 80,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFF4D6BFE).withAlpha(30),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Icon(Icons.phone_android, size: 40, color: Color(0xFF4D6BFE)),
+          ),
+          const SizedBox(height: 20),
           const Text(
             'DSH Mobile',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
           Text(

@@ -37,7 +37,6 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
     super.dispose();
   }
 
-  /// 打开扫码页，扫到 URL 后自动填进地址框。
   Future<void> _scan() async {
     final url = await Navigator.of(context).push<String>(
       MaterialPageRoute(builder: (_) => const ScannerScreen()),
@@ -47,7 +46,6 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
     }
   }
 
-  /// 握手成功后自动进入会话列表。
   void _onStateChanged() {
     final state = AppState.instance;
     if (!mounted || _navigated) return;
@@ -79,62 +77,107 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
     return Scaffold(
-      appBar: AppBar(title: const Text('连接 DeepSeek Harness')),
+      appBar: AppBar(title: const Text('DSH Mobile')),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Icon(Icons.hub_outlined, size: 72, color: theme.colorScheme.primary),
-            const SizedBox(height: 16),
-            Text(
-              '输入你的 DSH 服务地址',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '局域网：http://电脑IP:3080\n远程：http://<Tailscale IP>:3080',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
-            ),
-            const SizedBox(height: 24),
-            TextField(
-              controller: _controller,
-              keyboardType: TextInputType.url,
-              autocorrect: false,
-              decoration: InputDecoration(
-                labelText: '服务地址',
-                hintText: 'http://192.168.1.5:3080',
-                prefixIcon: const Icon(Icons.dns_outlined),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.qr_code_scanner),
-                  tooltip: '扫码填写地址',
-                  onPressed: _scan,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 图标
+                Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    color: primary.withAlpha(30),
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: Icon(Icons.hub_outlined, size: 44, color: primary),
                 ),
-                border: const OutlineInputBorder(),
-              ),
-              onSubmitted: (_) => _connect(),
+                const SizedBox(height: 24),
+                // 标题
+                Text(
+                  '连接 DeepSeek Harness',
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '输入 DSH 服务地址，或扫码自动填入',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                // 地址输入框
+                TextField(
+                  controller: _controller,
+                  keyboardType: TextInputType.url,
+                  autocorrect: false,
+                  style: const TextStyle(fontSize: 15, fontFamily: 'monospace'),
+                  decoration: InputDecoration(
+                    hintText: 'http://192.168.1.5:3080',
+                    labelText: '服务地址',
+                    prefixIcon: const Icon(Icons.dns_outlined),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.qr_code_scanner),
+                      tooltip: '扫码填写地址',
+                      onPressed: _scan,
+                    ),
+                  ),
+                  onSubmitted: (_) => _connect(),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.errorContainer.withAlpha(80),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, size: 18, color: theme.colorScheme.error),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(_error!, style: TextStyle(color: theme.colorScheme.error, fontSize: 13))),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                // 连接按钮
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: FilledButton.icon(
+                    onPressed: _busy ? null : _connect,
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.link),
+                    label: Text(_busy ? '连接中…' : '连接', style: const TextStyle(fontSize: 16)),
+                    style: FilledButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // 提示
+                Text(
+                  '局域网：http://电脑IP:3080\n远程：http://<Tailscale IP>:3080',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                ),
+              ],
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
-            ],
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _busy ? null : _connect,
-              icon: _busy
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.link),
-              label: Text(_busy ? '连接中…' : '连接'),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '提示：DSH 服务端需以 --host 0.0.0.0 启动，并保证手机与电脑网络互通。',
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
-              textAlign: TextAlign.center,
-            ),
-          ],
+          ),
         ),
       ),
     );
