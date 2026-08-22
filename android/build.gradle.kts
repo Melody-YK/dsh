@@ -21,6 +21,15 @@ subprojects {
 subprojects {
     project.evaluationDependsOn(":app")
 }
+// 本机只装了 build-tools 36.1.0；强制所有 Android 模块（含 mobile_scanner 等插件）
+// 都用它，避免它们各自 pin 的 36.0.0 触发 sdkmanager 自动下载而挂起
+subprojects {
+    afterEvaluate {
+        (extensions.findByName("android") as? com.android.build.gradle.BaseExtension)?.let {
+            it.buildToolsVersion = "36.1.0"
+        }
+    }
+}
 
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
