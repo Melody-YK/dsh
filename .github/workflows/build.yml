@@ -29,6 +29,11 @@ jobs:
         with:
           flutter-version: "3.47.0"
       - run: flutter pub get
+      # gradle.properties 禁用了 AGP 自动下载 SDK；runner 上手动装齐固定版本
+      - name: Install Android SDK components
+        run: |
+          sdkmanager --install "ndk;28.1.13356709" "build-tools;36.1.0"
+          yes | sdkmanager --licenses > /dev/null
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:

@@ -26,6 +26,7 @@ class _AboutScreenState extends State<AboutScreen> {
   String? _latestVersion;
   String? _latestUrl;
   String? _error;
+  bool _noRelease = false;
 
   Future<void> _checkUpdate() async {
     setState(() {
@@ -33,6 +34,7 @@ class _AboutScreenState extends State<AboutScreen> {
       _latestVersion = null;
       _latestUrl = null;
       _error = null;
+      _noRelease = false;
     });
 
     try {
@@ -43,6 +45,17 @@ class _AboutScreenState extends State<AboutScreen> {
         uri,
         headers: {'Accept': 'application/vnd.github+json'},
       ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 404) {
+        // 仓库还没有任何 Release —— 这是正常状态，不是错误
+        setState(() {
+          _latestVersion = null;
+          _error = null;
+          _noRelease = true;
+          _checking = false;
+        });
+        return;
+      }
 
       if (response.statusCode != 200) {
         setState(() {
@@ -220,6 +233,19 @@ class _AboutScreenState extends State<AboutScreen> {
                     Icon(Icons.check_circle, color: theme.colorScheme.primary),
                     const SizedBox(width: 8),
                     const Text('已是最新版本'),
+                  ],
+                ),
+              ),
+            ),
+          ] else if (_noRelease) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: theme.colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 8),
+                    const Expanded(child: Text('暂无发布版本，等待作者发布第一个 Release')),
                   ],
                 ),
               ),
