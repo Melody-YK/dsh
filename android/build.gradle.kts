@@ -21,19 +21,17 @@ subprojects {
 subprojects {
     project.evaluationDependsOn(":app")
 }
-// 本机只装了 build-tools 36.1.0；强制所有 Android 模块（含 mobile_scanner 等插件）
-// 都用它，避免它们各自 pin 的 36.0.0 触发 sdkmanager 自动下载而挂起
-// 本机只装了 build-tools 36.1.0 + NDK 28.1.13356709；
-// 强制所有 Android 子模块用它，避免 pin 到 28.2 触发 sdkmanager 下载
+// 本地 build-tools 版本，强制所有 Android 模块用它
+// Windows: 36.0.0 / Mac: 36.1.0 — 按本地实际安装的版本改
 subprojects {
     plugins.withId("com.android.library") {
         extensions.configure<com.android.build.gradle.LibraryExtension> {
-            buildToolsVersion = "36.1.0"
+            buildToolsVersion = "36.0.0"
         }
     }
     plugins.withId("com.android.application") {
         extensions.configure<com.android.build.gradle.AppExtension> {
-            buildToolsVersion = "36.1.0"
+            buildToolsVersion = "36.0.0"
         }
     }
 }

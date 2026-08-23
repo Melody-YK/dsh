@@ -10,8 +10,8 @@ android {
     // mobile_scanner 等原生插件场景需要 NDK；固定为本地已安装的版本，
     // 避免 AGP 自动下载 28.2 触发 sdkmanager（网络慢会挂起）
     ndkVersion = "28.2.13676358"
-    // 本机只装了 build-tools 36.1.0，R8 需要显式指定，避免找 36.0.0
-    buildToolsVersion = "36.1.0"
+    // 本机只装了 build-tools 36.0.0，R8 需要显式指定
+    buildToolsVersion = "36.0.0"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
