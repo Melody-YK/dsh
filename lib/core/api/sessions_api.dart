@@ -156,6 +156,12 @@ class SessionsApi {
     _requireOk(result, 'session.rename');
   }
 
+  /// 删除会话。
+  Future<void> deleteSession(String sessionId) async {
+    final result = await _rpc.callUnary('session.delete', {'sessionId': sessionId});
+    _requireOk(result, 'session.delete');
+  }
+
   // ---------- 工作区（文件夹）管理 ----------
 
   /// 工作区列表 + 归档会话 id 集合。

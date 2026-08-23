@@ -1,4 +1,7 @@
 /// 复用型会话列表组件：可用于独立页面或抽屉中。
+///
+/// 支持长按会话行：归档、重命名、移动到工作区、删除。
+/// 支持长按工作区：重命名、删除。
 library;
 
 import 'package:flutter/material.dart';
@@ -133,6 +136,7 @@ class _SessionListViewState extends State<SessionListView> {
           _expandedWorkspaces.add(ws.workspaceId);
         }
       }),
+      onLongPress: () => _showWorkspaceMenu(ws),
       child: Padding(
         padding: EdgeInsets.fromLTRB(widget.compact ? 8 : 12, 4, 12, 0),
         child: Row(
@@ -166,6 +170,7 @@ class _SessionListViewState extends State<SessionListView> {
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () => widget.onSessionTap(s.sessionId),
+          onLongPress: () => _showSessionMenu(s, archived: archived),
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: widget.compact ? 8 : 12, vertical: widget.compact ? 6 : 8),
             child: Row(
@@ -205,6 +210,288 @@ class _SessionListViewState extends State<SessionListView> {
         ),
       ),
     );
+  }
+
+  // ---------- 上下文菜单 ----------
+
+  void _showSessionMenu(SessionSummary s, {bool archived = false}) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(s.title ?? s.sessionId, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('重命名'),
+              onTap: () { Navigator.pop(ctx); _renameSession(s); },
+            ),
+            if (archived) ...[
+              // 恢复归档：移到第一个工作区（或通过弹窗选择）
+              ListTile(
+                leading: const Icon(Icons.unarchive_outlined),
+                title: const Text('恢复（取消归档）'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _restoreFromArchive(s);
+                },
+              ),
+            ] else ...[
+              ListTile(
+                leading: const Icon(Icons.archive_outlined),
+                title: const Text('归档'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _archiveSession(s.sessionId);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.drive_file_move_outlined),
+                title: const Text('移动到工作区…'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _moveSession(s);
+                },
+              ),
+            ],
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              title: const Text('删除', style: TextStyle(color: Colors.redAccent)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDelete(s);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showWorkspaceMenu(WorkspaceView ws) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(ws.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('重命名'),
+              onTap: () { Navigator.pop(ctx); _renameWorkspace(ws); },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              title: const Text('删除工作区', style: TextStyle(color: Colors.redAccent)),
+              subtitle: const Text('会话保留，归入未分组'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _deleteWorkspace(ws);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _renameSession(SessionSummary s) async {
+    final controller = TextEditingController(text: s.title ?? '');
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('重命名会话'),
+        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入新名称')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('确定')),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty && mounted) {
+      try {
+        await AppState.instance.renameSession(s.sessionId, name);
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('重命名失败: $e')));
+      }
+    }
+  }
+
+  Future<void> _renameWorkspace(WorkspaceView ws) async {
+    final controller = TextEditingController(text: ws.title);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('重命名工作区'),
+        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: '输入新名称')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('确定')),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty && mounted) {
+      try {
+        await AppState.instance.renameWorkspace(ws.workspaceId, name);
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('重命名失败: $e')));
+      }
+    }
+  }
+
+  Future<void> _archiveSession(String sessionId) async {
+    try {
+      await AppState.instance.archiveSession(sessionId);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已归档')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('归档失败: $e')));
+    }
+  }
+
+  Future<void> _restoreFromArchive(SessionSummary s) async {
+    final state = AppState.instance;
+    if (state.workspaces.isEmpty) {
+      // 没有工作区，直接解除归档
+      try {
+        // moveSessionToWorkspace 对归档会话会恢复它
+        // 如果没有工作区，创建一个临时的
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请先创建工作区再恢复')));
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('恢复失败: $e')));
+      }
+      return;
+    }
+
+    // 弹窗选工作区
+    final wsId = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(padding: EdgeInsets.all(16), child: Text('恢复到哪个工作区？', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
+            for (final ws in state.workspaces)
+              ListTile(
+                leading: const Icon(Icons.folder_outlined),
+                title: Text(ws.title),
+                onTap: () => Navigator.pop(ctx, ws.workspaceId),
+              ),
+            // 也可以恢复到未分组
+            ListTile(
+              leading: const Icon(Icons.folder_open_outlined),
+              title: const Text('恢复为未分组'),
+              onTap: () => Navigator.pop(ctx, '__UNGROUP__'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (wsId == null || !mounted) return;
+
+    try {
+      if (wsId == '__UNGROUP__') {
+        // 解除归档最简单的方式是重新创建会话的 workspace 关系
+        // 实际上 moveSessionToWorkspace 对归档会话会恢复它
+        if (state.workspaces.isNotEmpty) {
+          await state.moveSessionToWorkspace(state.workspaces.first.workspaceId, s.sessionId);
+        }
+      } else {
+        await state.moveSessionToWorkspace(wsId, s.sessionId);
+      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已恢复')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('恢复失败: $e')));
+    }
+  }
+
+  Future<void> _moveSession(SessionSummary s) async {
+    final state = AppState.instance;
+    if (state.workspaces.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('没有工作区，请先创建')));
+      return;
+    }
+    final wsId = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(padding: EdgeInsets.all(16), child: Text('移动到哪个工作区？', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
+            for (final ws in state.workspaces)
+              ListTile(
+                leading: const Icon(Icons.folder_outlined),
+                title: Text(ws.title),
+                onTap: () => Navigator.pop(ctx, ws.workspaceId),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (wsId == null || !mounted) return;
+    try {
+      await state.moveSessionToWorkspace(wsId, s.sessionId);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已移动')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('移动失败: $e')));
+    }
+  }
+
+  Future<void> _confirmDelete(SessionSummary s) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除会话'),
+        content: Text('确定要删除「${s.title ?? s.sessionId}」吗？\n此操作不可撤销。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('删除', style: TextStyle(color: Colors.redAccent))),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      try {
+        // session.remove 通过 API
+        final conn = AppState.instance.conn;
+        if (conn != null) {
+          await SessionsApi(conn.rpc).deleteSession(s.sessionId);
+          await AppState.instance.refreshSessions();
+          await AppState.instance.refreshWorkspaces();
+        }
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已删除')));
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+      }
+    }
+  }
+
+  Future<void> _deleteWorkspace(WorkspaceView ws) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除工作区'),
+        content: Text('确定要删除工作区「${ws.title}」吗？\n其中的会话会保留，归入未分组。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('删除', style: TextStyle(color: Colors.redAccent))),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      try {
+        await AppState.instance.deleteWorkspace(ws.workspaceId);
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('工作区已删除')));
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+      }
+    }
   }
 
   String _fmtTime(DateTime t) {

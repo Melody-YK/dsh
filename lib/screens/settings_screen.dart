@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../state/app_state.dart';
-import '../../main.dart';
+import '../main.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -211,14 +211,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ListTile(
                   leading: const Icon(Icons.info_outline, color: _primary),
                   title: const Text('关于 DSH Mobile'),
-                  subtitle: const Text('版本 0.4.0 · 检查更新'),
+                  subtitle: const Text('版本 0.5.0 · 检查更新'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(context).pushNamed('/about'),
                 ),
 
                 const SizedBox(height: 32),
                 Center(
-                  child: Text('DSH Mobile v0.4.0', style: TextStyle(fontSize: 12, color: theme.colorScheme.outline)),
+                  child: Text('DSH Mobile v0.5.0', style: TextStyle(fontSize: 12, color: theme.colorScheme.outline)),
                 ),
                 const SizedBox(height: 32),
               ],
