@@ -26,10 +26,11 @@ $tsIp = $null
 $tsDomain = $null
 if (Test-Path $tsExe) {
     $tsIp = (& $tsExe ip -4 2>$null | Select-Object -First 1)
-    try {
-        $tsJson = & $tsExe status --json 2>$null | ConvertFrom-Json
-        $tsDomain = ($tsJson.Self.DNSName -replace '\.$','')  # 去掉末尾点
-    } catch {}
+    # 用正则直接取 DNSName，避免 ConvertFrom-Json 在 PowerShell 5.1 上失败
+    $tsOut = & $tsExe status --json 2>$null | Out-String
+    if ($tsOut -match '"DNSName"\s*:\s*"([^"]+)"') {
+        $tsDomain = $Matches[1] -replace '\.$',''
+    }
 }
 
 # --- 3. Start DSH web fully hidden (skip if already listening) ---
