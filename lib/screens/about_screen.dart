@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:open_filex/open_filex.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -134,8 +135,10 @@ class _AboutScreenState extends State<AboutScreen> {
           if (mounted) {
             setState(() => _downloading = false);
             try {
-              final uri = Uri.file(file.path);
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
+              final result = await OpenFilex.open(file.path);
+              if (result.type != ResultType.done) {
+                setState(() => _downloadError = '无法打开安装器（${result.message}），请在文件管理器中手动安装:\n${file.path}');
+              }
             } catch (_) {
               setState(() => _downloadError = '无法打开安装器，请在文件管理器中手动安装:\n${file.path}');
             }
