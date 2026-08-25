@@ -1,4 +1,4 @@
-/// 关于页：版本信息 + 检查更新 + App 内下载安装。
+/// 关于页：版本信息 + 检查更新 + 历史版本回退 + App 内下载安装。
 library;
 
 import 'dart:convert';
@@ -17,7 +17,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _currentVersion = '0.5.0';
+  static const _currentVersion = '0.5.1';
   static const _repoOwner = 'Melody-YK';
   static const _repoName = 'dsh';
   static const _primary = Color(0xFF4D6BFE);
@@ -33,6 +33,51 @@ class _AboutScreenState extends State<AboutScreen> {
   bool _downloading = false;
   double _downloadProgress = 0;
   String? _downloadError;
+  String? _downloadingVersion;
+
+  // 历史版本列表
+  List<_ReleaseInfo> _releases = [];
+  bool _loadingReleases = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReleases();
+  }
+
+  Future<void> _loadReleases() async {
+    setState(() => _loadingReleases = true);
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.github.com/repos/$_repoOwner/$_repoName/releases?per_page=20'),
+        headers: {'Accept': 'application/vnd.github+json'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final list = json.decode(response.body) as List;
+        final releases = <_ReleaseInfo>[];
+        for (final item in list) {
+          final m = item as Map<String, dynamic>;
+          final tag = (m['tag_name'] as String?)?.replaceFirst(RegExp(r'^v'), '') ?? '?';
+          final htmlUrl = m['html_url'] as String?;
+          final assets = (m['assets'] as List?) ?? [];
+          String? apkUrl;
+          for (final a in assets) {
+            if ((a as Map)['name'] == 'app-release.apk') {
+              apkUrl = a['browser_download_url'] as String?;
+              break;
+            }
+          }
+          releases.add(_ReleaseInfo(version: tag, url: htmlUrl ?? '', apkUrl: apkUrl));
+        }
+        if (mounted) setState(() { _releases = releases; _loadingReleases = false; });
+      } else {
+        if (mounted) setState(() => _loadingReleases = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingReleases = false);
+    }
+  }
 
   Future<void> _checkUpdate() async {
     setState(() {
@@ -108,15 +153,19 @@ class _AboutScreenState extends State<AboutScreen> {
     return 0;
   }
 
-  Future<void> _downloadAndInstall() async {
-    if (_downloadUrl == null) return;
-    setState(() { _downloading = true; _downloadProgress = 0; _downloadError = null; });
+  Future<void> _downloadAndInstall(String url, String version) async {
+    setState(() {
+      _downloading = true;
+      _downloadingVersion = version;
+      _downloadProgress = 0;
+      _downloadError = null;
+    });
 
     try {
       final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/dsh-mobile-update.apk');
+      final file = File('${dir.path}/dsh-mobile-$version.apk');
       final client = http.Client();
-      final request = http.Request('GET', Uri.parse(_downloadUrl!));
+      final request = http.Request('GET', Uri.parse(url));
       final streamedResp = await client.send(request);
       final total = streamedResp.contentLength;
       final sink = file.openWrite();
@@ -225,7 +274,7 @@ class _AboutScreenState extends State<AboutScreen> {
                     ]),
                     const SizedBox(height: 12),
                     // 下载进度
-                    if (_downloading) ...[
+                    if (_downloading && _downloadingVersion == _latestVersion) ...[
                       ClipRRect(
                         borderRadius: BorderRadius.circular(6),
                         child: LinearProgressIndicator(value: _downloadProgress, minHeight: 8),
@@ -240,17 +289,15 @@ class _AboutScreenState extends State<AboutScreen> {
                         child: Text(_downloadError!, style: TextStyle(color: theme.colorScheme.error, fontSize: 12)),
                       ),
                     ],
-                    // 下载并安装按钮
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed: _downloading ? null : _downloadAndInstall,
+                        onPressed: (_downloading || _downloadUrl == null) ? null : () => _downloadAndInstall(_downloadUrl!, _latestVersion!),
                         icon: const Icon(Icons.download),
                         label: const Text('下载并安装'),
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // 备用：浏览器打开
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -288,8 +335,88 @@ class _AboutScreenState extends State<AboutScreen> {
               ),
             ),
           ],
+
+          // 历史版本（回退）
+          const SizedBox(height: 32),
+          Row(
+            children: [
+              const Icon(Icons.history, size: 18, color: _primary),
+              const SizedBox(width: 8),
+              Text('历史版本', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
+              const Spacer(),
+              if (_loadingReleases)
+                const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_releases.isEmpty && !_loadingReleases)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text('暂无历史版本', style: TextStyle(color: theme.colorScheme.outline, fontSize: 13)),
+            ),
+          for (final r in _releases) ...[
+            _buildReleaseRow(r, theme),
+            const SizedBox(height: 4),
+          ],
+          const SizedBox(height: 32),
         ],
       ),
     );
   }
+
+  Widget _buildReleaseRow(_ReleaseInfo r, ThemeData theme) {
+    final isCurrent = r.version == _currentVersion;
+    final isDownloading = _downloading && _downloadingVersion == r.version;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            Icon(
+              isCurrent ? Icons.check_circle : Icons.circle_outlined,
+              size: 16,
+              color: isCurrent ? _primary : theme.colorScheme.outline,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'v${r.version}${isCurrent ? '（当前）' : ''}',
+                style: TextStyle(
+                  fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w400,
+                  color: isCurrent ? _primary : null,
+                ),
+              ),
+            ),
+            if (isDownloading)
+              SizedBox(
+                width: 100,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(value: _downloadProgress, minHeight: 4),
+                ),
+              )
+            else if (!isCurrent && r.apkUrl != null)
+              TextButton.icon(
+                onPressed: _downloading ? null : () => _downloadAndInstall(r.apkUrl!, r.version),
+                icon: const Icon(Icons.download, size: 16),
+                label: const Text('安装', style: TextStyle(fontSize: 13)),
+              )
+            else if (!isCurrent && r.apkUrl == null)
+              TextButton(
+                onPressed: () => launchUrl(Uri.parse(r.url), mode: LaunchMode.externalApplication),
+                child: const Text('查看', style: TextStyle(fontSize: 13)),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReleaseInfo {
+  _ReleaseInfo({required this.version, required this.url, this.apkUrl});
+  final String version;
+  final String url;
+  final String? apkUrl;
 }
