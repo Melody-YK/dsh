@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'navigation.dart';
 import 'screens/chat_screen.dart';
@@ -16,9 +17,25 @@ import 'widgets/respond_handler.dart';
 /// 全局主题通知器，设置页修改后触发重建
 final themeNotifier = ValueNotifier<ThemeMode>(ThemeMode.dark);
 
+/// 全局通知插件实例（供 app_state 使用）。
+final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppState.instance.load();
+
+  // 初始化通知通道
+  const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+  await flutterLocalNotificationsPlugin.initialize(
+    const InitializationSettings(android: androidSettings),
+    onDidReceiveNotificationResponse: (response) {
+      // 点击通知 → 跳转到对应会话
+      if (response.payload != null) {
+        appNavigatorKey.currentState?.pushNamed('/chat', arguments: response.payload);
+      }
+    },
+  );
+
   // 恢复保存的主题
   final prefs = await SharedPreferences.getInstance();
   final saved = prefs.getString('theme_mode') ?? 'dark';

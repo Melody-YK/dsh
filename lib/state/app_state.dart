@@ -6,13 +6,16 @@ library;
 
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../core/api/sessions_api.dart';
 import '../core/protocol/connection.dart';
 import '../core/protocol/host_frame.dart';
 import '../core/protocol/rpc_client.dart';
+import '../main.dart';
+import '../navigation.dart';
 
 class AppState extends ChangeNotifier {
   AppState._();
@@ -166,6 +169,7 @@ class AppState extends ChangeNotifier {
     final idx = sessions.indexWhere((s) => s.sessionId == sessionId);
     if (idx < 0) return;
     final old = sessions[idx];
+    final wasRunning = old.running;
     sessions[idx] = SessionSummary(
       sessionId: old.sessionId,
       updatedAt: old.updatedAt,
@@ -176,10 +180,53 @@ class AppState extends ChangeNotifier {
       parentSessionId: old.parentSessionId,
       title: old.title,
     );
+    // 会话完成 → 发通知
+    if (wasRunning && !running) {
+      _notifyCompleted(sessionId);
+    }
   }
 
   void _sortSessions() {
     sessions.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
+  // ---------- 通知 ----------
+
+  static const _channelId = 'dsh_session';
+  static const _channelName = '会话完成';
+  static const _channelDesc = 'DSH 会话回复完成时通知';
+
+  /// 会话完成通知：App 在后台 / 不在该会话页时弹通知。
+  void _notifyCompleted(String sessionId) {
+    // 判断是否需要通知：当前正在看的会话不弹
+    final nav = appNavigatorKey.currentState;
+    final currentRoute = nav != null
+        ? ModalRoute.of(nav.context)?.settings
+        : null;
+    if (currentRoute?.name == '/chat' && currentRoute?.arguments == sessionId) {
+      return; // 用户正在看这个会话，不弹
+    }
+
+    final session = sessions.firstWhere((s) => s.sessionId == sessionId,
+        orElse: () => SessionSummary(sessionId: sessionId, updatedAt: 0, running: false, blank: false));
+    final title = session.title ?? session.agentPreset ?? session.cwd ?? sessionId;
+    final shortTitle = title.length > 30 ? '${title.substring(0, 30)}…' : title;
+
+    flutterLocalNotificationsPlugin.show(
+      sessionId.hashCode.abs(),
+      'DSH 回复完成',
+      shortTitle,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          channelDescription: _channelDesc,
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+        ),
+      ),
+      payload: sessionId,
+    );
   }
 
   /// 拉取会话列表（连接后、或手动刷新时调用）。
