@@ -1,7 +1,7 @@
 name: dsh_mobile
 description: "DeepSeek Harness 手机端：原生 App 直连 DSH /api 协议（HTTP RPC + WebSocket 下行流）"
 publish_to: "none"
-version: 0.5.1
+version: 0.5.2
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

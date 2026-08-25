@@ -17,7 +17,7 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  static const _currentVersion = '0.5.1';
+  static const _currentVersion = '0.5.2';
   static const _repoOwner = 'Melody-YK';
   static const _repoName = 'dsh';
   static const _primary = Color(0xFF4D6BFE);
