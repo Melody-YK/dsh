@@ -6,10 +6,10 @@ permissions:
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     tags: ["v*"]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   analyze:
@@ -38,7 +38,7 @@ jobs:
         run: |
           SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --licenses > /dev/null
-          yes | "$SDKMANAGER" --install "ndk;28.2.13676358" "build-tools;36.1.0" > /dev/null
+          yes | "$SDKMANAGER" --install "ndk;28.2.13676358" "build-tools;36.0.0" > /dev/null
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
