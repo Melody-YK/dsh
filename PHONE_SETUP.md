@@ -63,15 +63,15 @@ tailscale serve --bg --tcp=3081 3080
 
 ### 远程（出门在外，Tailscale）
 
-**Windows 主机**：Tailscale IP `100.106.157.69`（desktop-fu8glfm），已配置 serve。
+**Windows 主机**：MagicDNS `desktop-fu8glfm.tail7f6aae.ts.net`（desktop-fu8glfm），已配置 serve。
 
-**Mac 主机**：Tailscale IP `100.122.227.32`（melodymacbook-air），已配置 serve + dsh-mobile 插件。
+**Mac 主机**：MagicDNS `melodymacbook-air.tail7f6aae.ts.net`（melodymacbook-air），已配置 serve + dsh-mobile 插件。
 
 **手机端**（同 tailnet 账号 `1340135887@`）：
 1. 手机装 Tailscale App，登录同一账号并保持连接
 2. DSH Mobile 里填：
-   - 连 Windows：`http://100.106.157.69:3081`
-   - 连 Mac：`http://100.122.227.32:3081`
+   - 连 Windows：`http://desktop-fu8glfm.tail7f6aae.ts.net:3081`（MagicDNS，**永不变**）
+   - 连 Mac：`http://melodymacbook-air.tail7f6aae.ts.net:3081`（MagicDNS，**永不变**）
 3. 或扫码连接页上的二维码
 
 常用命令：

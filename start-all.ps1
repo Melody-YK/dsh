@@ -1,4 +1,4 @@
-﻿# DSH one-click startup (silent version):
+# DSH one-click startup (silent version):
 # - DSH web + forwarder run fully hidden (logs written to files)
 # - only ONE window pops up at the end: a connection page (URL + QR code)
 $ErrorActionPreference = 'Continue'
@@ -21,10 +21,15 @@ if (-not $lanIp) {
         Select-Object -First 1).IPAddress
 }
 
-# --- 2. Detect Tailscale IP ---
+# --- 2. Detect Tailscale IP & MagicDNS ---
 $tsIp = $null
+$tsDomain = $null
 if (Test-Path $tsExe) {
     $tsIp = (& $tsExe ip -4 2>$null | Select-Object -First 1)
+    try {
+        $tsJson = & $tsExe status --json 2>$null | ConvertFrom-Json
+        $tsDomain = ($tsJson.Self.DNSName -replace '\.$','')  # 去掉末尾点
+    } catch {}
 }
 
 # --- 3. Start DSH web fully hidden (skip if already listening) ---
@@ -35,6 +40,7 @@ if ($dshUp) {
     $trusted = ''
     if ($lanIp) { $trusted += " --trusted-host $lanIp`:3080 --trusted-host $lanIp`:3081" }
     if ($tsIp)   { $trusted += " --trusted-host $tsIp" }
+    if ($tsDomain) { $trusted += " --trusted-host $tsDomain" }
     $bat = Join-Path $tmpDir 'dsh-web.bat'
     $logFile = Join-Path $logDir 'dsh-3080.log'
     $content = "@echo off`r`ncd /d `"$dshRoot`"`r`nnode `"$binJs`" web --host 127.0.0.1 --port 3080$trusted >> `"$logFile`" 2>&1`r`n"
@@ -60,9 +66,11 @@ if (Test-Path $tsExe) {
 }
 
 # --- 6. Build the ONE connection page (URL + QR) and open it ---
-$remoteUrl = if ($tsIp) { "http://${tsIp}:3081" } else { $null }
+# MagicDNS 优先（稳定永不变），其次 Tailscale IP，最后局域网 IP
+$magicUrl = if ($tsDomain) { "http://${tsDomain}:3081" } else { $null }
+$remoteUrl = if ($tsIp -and -not $tsDomain) { "http://${tsIp}:3081" } else { $null }
 $lanUrl = if ($lanIp) { "http://${lanIp}:3081" } else { $null }
-$primaryUrl = if ($remoteUrl) { $remoteUrl } else { $lanUrl }
+$primaryUrl = if ($magicUrl) { $magicUrl } elseif ($remoteUrl) { $remoteUrl } else { $lanUrl }
 
 $qrSrc = ''
 if ($primaryUrl) {
@@ -75,7 +83,9 @@ $html = @"
 <body style="font-family:'Segoe UI',sans-serif;text-align:center;padding:40px 24px;">
 <h1 style="margin:0 0 8px;">DSH Mobile 连接</h1>
 <p style="color:#666;margin:0 0 20px;">手机 DSH Mobile → 服务地址 → 点扫码图标，扫下面的二维码</p>
-$(if ($primaryUrl) { "<p style='font-size:26px;color:#4D6BFE;margin:0 0 20px;user-select:all;'>$primaryUrl</p>" } else { '' })
+$(if ($magicUrl) { "<p style='font-size:26px;color:#4D6BFE;margin:0 0 8px;user-select:all;'>$magicUrl</p>" } else { '' })
+$(if ($magicUrl) { "<p style='color:#888;font-size:13px;margin:0 0 20px;'>MagicDNS 稳定地址，永远不变</p>" } else { '' })
+$(if (-not $magicUrl -and $primaryUrl) { "<p style='font-size:26px;color:#4D6BFE;margin:0 0 20px;user-select:all;'>$primaryUrl</p>" } else { '' })
 $(if ($qrSrc) { "<img src='$qrSrc' width='280' height='280' alt='二维码加载失败，请手动输入上面地址'>" } else { '<p>未能获取地址，请检查网络后重试</p>' })
 $(if ($lanUrl -and $remoteUrl -and $lanUrl -ne $remoteUrl) { "<p style='color:#999;margin-top:16px;'>同一 WiFi 备用：<span style='user-select:all;'>$lanUrl</span></p>" } else { '' })
 <p style="color:#999;margin-top:20px;">扫完关掉这个页面即可，服务已在后台运行。</p>
