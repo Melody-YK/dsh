@@ -53,7 +53,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" \
-            build/app/outputs/flutter-apk/app-release.apk \
-            --title "DSH Mobile ${{ github.ref_name }}" \
-            --notes "Android APK release, signed. 安装见下方。"
+          # 幂等：已有 Release 就上传 APK，没有就新建
+          if gh release view "${{ github.ref_name }}" > /dev/null 2>&1; then
+            echo "Release exists, uploading APK..."
+            gh release upload "${{ github.ref_name }}" \
+              build/app/outputs/flutter-apk/app-release.apk --clobber
+          else
+            gh release create "${{ github.ref_name }}" \
+              build/app/outputs/flutter-apk/app-release.apk \
+              --title "DSH Mobile ${{ github.ref_name }}" \
+              --notes "Android APK release, signed. 安装见下方。"
+          fi
