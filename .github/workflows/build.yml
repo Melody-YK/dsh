@@ -38,7 +38,12 @@ jobs:
         run: |
           SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --licenses > /dev/null
-          yes | "$SDKMANAGER" --install "ndk;28.2.13676358" "build-tools;36.0.0" > /dev/null
+          yes | "$SDKMANAGER" --install \
+            "ndk;28.2.13676358" \
+            "build-tools;36.0.0" \
+            "platforms;android-34" \
+            "platforms;android-35" \
+            "cmake;3.22.1" > /dev/null
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
